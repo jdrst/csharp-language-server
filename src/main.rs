@@ -1,7 +1,6 @@
 use ::futures::future::try_join;
 use anyhow::{Context, Result};
 use rust_search::SearchBuilder;
-use serde_json::json;
 use std::{
     env::current_dir,
     io::{BufRead, BufReader},
@@ -53,13 +52,14 @@ async fn main() {
     println!("Found solution: {}", found_solution);
 
     // Send open solution lsp command
-    let open_solution_notification = create_open_solution_notification(found_solution);
     let mut stream = UnixStream::connect(parsed_roslyn_response.pipe_name)
         .await
         .unwrap();
 
-    let message = json!(open_solution_notification).to_string();
-    stream.write_all(message.as_bytes()).await.unwrap();
+    let open_solution_notification = create_open_solution_notification(found_solution);
+
+    println!("{open_solution_notification}");
+    stream.write_all(open_solution_notification.as_bytes()).await.unwrap();
     stream.flush().await.unwrap();
 
     forward_in_out(stream).await.unwrap();
