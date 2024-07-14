@@ -93,16 +93,17 @@ fn create_open_solution_notification(file_path: &str) -> String {
         jsonrpc: "2.0".to_string(),
         method: "solution/open".to_string(),
         params: SolutionParams {
-            solution: FileUri {
-                uri: format!("file://{file_path}"),
-            },
+            solution: format!("file://{file_path}"),
         },
     };
 
     let message = serde_json::to_string(&notificatin).expect("Unable to serialize notification");
 
     let header = format!("Content-Length: {}\r\n\r\n", message.len());
-    format!("{}{}", header, message)
+    let full_messsage = format!("{}{}", header, message);
+    println!("{full_messsage}");
+
+    full_messsage
 }
 
 async fn forward_in_out_to_socket(mut socket: UnixStream) -> Result<()> {
@@ -128,10 +129,5 @@ struct Notification {
 
 #[derive(Serialize, Debug)]
 struct SolutionParams {
-    solution: FileUri,
-}
-
-#[derive(Serialize, Debug)]
-struct FileUri {
-    uri: String,
+    solution: String,
 }
