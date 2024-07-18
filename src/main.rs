@@ -82,12 +82,14 @@ async fn forward_in_out_to_socket(mut socket: UnixStream) -> Result<()> {
                 writer
                     .write_all(open_solution_notification.as_bytes())
                     .await?;
+                break;
             }
         }
+        io::copy(&mut stdin, &mut writer).await?;
         Ok(())
     };
 
-    try_join(stdin_to_socket, socket_to_stdout).await.unwrap();
+    try_join(stdin_to_socket, socket_to_stdout).await?;
 
     Ok(())
 }
