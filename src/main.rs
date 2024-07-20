@@ -1,10 +1,8 @@
-use std::process::Stdio;
+use std::{env::current_dir, process::Stdio};
 
 use ::futures::future::try_join;
 use anyhow::{Context, Result};
-use roslyn_language_server::{
-    create_open_solution_notification, find_solution_to_open, open_stream,
-};
+use rust_search::SearchBuilder;
 use tokio::{
     io::{self, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     net::UnixStream,
@@ -21,13 +19,6 @@ struct RoslynResponse {
 
 #[tokio::main]
 async fn main() {
-    let roslyn_response = start_roslyn_server().await;
-    let stream = open_stream(&roslyn_response.pipe_name).await;
-
-    forward_in_out_to_socket(stream).await.unwrap();
-}
-
-async fn start_roslyn_server() -> RoslynResponse {
     let mut process = Command::new("Microsoft.CodeAnalysis.LanguageServer")
         .arg("--logLevel=Information")
         .arg("--extensionLogDirectory")
@@ -37,16 +28,66 @@ async fn start_roslyn_server() -> RoslynResponse {
         .expect("Failed to execute command");
 
     let reader = BufReader::new(process.stdout.take().expect("Failed to capture stdout"));
-    let parsed_roslyn_response = parse_first_line(reader)
+    let roslyn_response = parse_roslyn_response(reader)
         .await
-        .expect("Unable to parse response from Roslyn");
+        .expect("Unable to parse response from server");
 
-    println!("Socket name: {}", parsed_roslyn_response.pipe_name);
+    let mut stream = UnixStream::connect(roslyn_response.pipe_name)
+        .await
+        .expect("Unable to connect to server stream");
 
-    parsed_roslyn_response
+    let (mut reader, mut writer) = stream.split();
+
+    let stdin = io::stdin();
+    let mut stdout = io::stdout();
+
+    let stream_to_stdout = io::copy(&mut reader, &mut stdout);
+    let stdin_to_stream = async {
+        let mut stdin = BufReader::new(stdin);
+        loop {
+            let mut buffer = vec![0; 3048];
+            let bytes_read = stdin
+                .read(&mut buffer)
+                .await
+                .expect("Unable to read incoming client notification");
+            if bytes_read == 0 {
+                break; // EOF reached
+            }
+
+            writer
+                .write_all(&buffer[..bytes_read])
+                .await
+                .expect("Unable to forward client notification to server");
+
+            let message = String::from_utf8(buffer[..bytes_read].to_vec())
+                .expect("Unable to convert buffer to string");
+
+            if message.contains("initialize") {
+                let solution_to_open = find_solution_to_open();
+
+                if let Some(solution_to_open) = solution_to_open {
+                    let open_solution_notification =
+                        create_open_solution_notification(&solution_to_open);
+
+                    writer
+                        .write_all(open_solution_notification.as_bytes())
+                        .await
+                        .expect("Unable to send open solution notification to server");
+
+                    break;
+                }
+
+                // TODO: Search for csproj files and send projects/open notification
+                break;
+            }
+        }
+        io::copy(&mut stdin, &mut writer).await
+    };
+
+    try_join(stdin_to_stream, stream_to_stdout).await.unwrap();
 }
 
-async fn parse_first_line(reader: BufReader<ChildStdout>) -> Result<RoslynResponse> {
+async fn parse_roslyn_response(reader: BufReader<ChildStdout>) -> Result<RoslynResponse> {
     let first_line = reader
         .lines()
         .next_line()
@@ -56,40 +97,46 @@ async fn parse_first_line(reader: BufReader<ChildStdout>) -> Result<RoslynRespon
     Ok(parsed)
 }
 
-async fn forward_in_out_to_socket(mut socket: UnixStream) -> Result<()> {
-    let (mut reader, mut writer) = socket.split();
+fn find_solution_to_open() -> Option<String> {
+    let execution_path = current_dir().unwrap();
+    let solution_search: Vec<String> = SearchBuilder::default()
+        .location(execution_path)
+        .ext("sln")
+        .build()
+        .collect();
 
-    let stdin = io::stdin();
-    let mut stdout = io::stdout();
+    solution_search.first().map(|found| found.to_owned())
+}
 
-    let socket_to_stdout = io::copy(&mut reader, &mut stdout);
-    let stdin_to_socket = async {
-        let mut stdin = BufReader::new(stdin);
-        loop {
-            let mut buffer = vec![0; 3048];
-            let bytes_read = stdin.read(&mut buffer).await?;
-            if bytes_read == 0 {
-                break; // EOF reached
-            }
-
-            writer.write_all(&buffer[..bytes_read]).await?;
-
-            let message = String::from_utf8(buffer[..bytes_read].to_vec()).unwrap();
-            if message.contains("initialize") {
-                let solution_to_open = find_solution_to_open();
-                let open_solution_notification =
-                    create_open_solution_notification(&solution_to_open);
-                writer
-                    .write_all(open_solution_notification.as_bytes())
-                    .await?;
-                break;
-            }
-        }
-        io::copy(&mut stdin, &mut writer).await?;
-        Ok(())
+fn create_open_solution_notification(file_path: &str) -> String {
+    let notificatin = Notification {
+        jsonrpc: "2.0".to_string(),
+        method: "solution/open".to_string(),
+        params: SolutionParams {
+            solution: format!("file://{file_path}"),
+        },
     };
 
-    try_join(stdin_to_socket, socket_to_stdout).await?;
+    let message = serde_json::to_string(&notificatin).expect("Unable to serialize notification");
 
-    Ok(())
+    create_notification(&message)
+}
+
+fn create_notification(body: &str) -> String {
+    let header = format!("Content-Length: {}\r\n\r\n", body.len());
+    let full_messsage = format!("{}{}", header, body);
+
+    full_messsage
+}
+
+#[derive(Serialize, Debug)]
+struct Notification {
+    jsonrpc: String,
+    method: String,
+    params: SolutionParams,
+}
+
+#[derive(Serialize, Debug)]
+struct SolutionParams {
+    solution: String,
 }
