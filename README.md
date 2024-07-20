@@ -16,3 +16,6 @@ command = "roslyn-language-server"
 name = "c-sharp"
 language-servers = ["roslyn"]
 ```
+
+## To do: 
+- Find and open `.csproj` files if no `.sln` file was found
