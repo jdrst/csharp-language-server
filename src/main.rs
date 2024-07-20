@@ -66,7 +66,7 @@ async fn forward_in_out_to_socket(mut socket: UnixStream) -> Result<()> {
     let stdin_to_socket = async {
         let mut stdin = BufReader::new(stdin);
         loop {
-            let mut buffer = vec![0; 2048];
+            let mut buffer = vec![0; 3048];
             let bytes_read = stdin.read(&mut buffer).await?;
             if bytes_read == 0 {
                 break; // EOF reached
