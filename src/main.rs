@@ -1,8 +1,9 @@
-use std::{env::current_dir, process::Stdio};
-
 use ::futures::future::try_join;
 use anyhow::{Context, Result};
+use home::home_dir;
 use rust_search::SearchBuilder;
+use serde_json::Value;
+use std::process::Stdio;
 use tokio::{
     io::{self, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
     net::UnixStream,
@@ -19,10 +20,13 @@ struct RoslynResponse {
 
 #[tokio::main]
 async fn main() {
+    let mut log_dir = home_dir().unwrap().into_os_string();
+    log_dir.push("/.roslyn/logs");
+
     let mut process = Command::new("Microsoft.CodeAnalysis.LanguageServer")
         .arg("--logLevel=Information")
         .arg("--extensionLogDirectory")
-        .arg("~/roslyn-language-server/logs")
+        .arg(log_dir)
         .stdout(Stdio::piped())
         .spawn()
         .expect("Failed to execute command");
@@ -63,7 +67,9 @@ async fn main() {
                 .expect("Unable to convert buffer to string");
 
             if message.contains("initialize") {
-                let solution_to_open = find_solution_to_open();
+                let root_path = parse_root_path(&message)
+                    .expect("Root path not part of initialize notification");
+                let solution_to_open = find_solution_to_open(&root_path);
 
                 if let Some(solution_to_open) = solution_to_open {
                     let open_solution_notification =
@@ -87,6 +93,20 @@ async fn main() {
     try_join(stdin_to_stream, stream_to_stdout).await.unwrap();
 }
 
+fn parse_root_path(notification: &str) -> Result<String> {
+    let json_start = notification
+        .find('{')
+        .context("Notification was not json")?;
+
+    let parsed_notification: Value = serde_json::from_str(&notification[json_start..])?;
+
+    let root_path = parsed_notification["params"]["rootPath"]
+        .as_str()
+        .context("Root path")?;
+
+    Ok(root_path.to_string())
+}
+
 async fn parse_roslyn_response(reader: BufReader<ChildStdout>) -> Result<RoslynResponse> {
     let first_line = reader
         .lines()
@@ -97,10 +117,9 @@ async fn parse_roslyn_response(reader: BufReader<ChildStdout>) -> Result<RoslynR
     Ok(parsed)
 }
 
-fn find_solution_to_open() -> Option<String> {
-    let execution_path = current_dir().unwrap();
+fn find_solution_to_open(root_path: &str) -> Option<String> {
     let solution_search: Vec<String> = SearchBuilder::default()
-        .location(execution_path)
+        .location(root_path)
         .ext("sln")
         .build()
         .collect();
