@@ -1,9 +1,30 @@
 # roslyn-language-server
-A wrapper around Roslyn language server which makes compatible with other editors, eg. Helix or Zed.
+A wrapper around the language server behind the C# Visual Studio Code extension, `Microsoft.CodeAnalysis.LanguageServer`, which makes it compatible with other editors, e.g., Helix.
+This is more stable and faster than OmniSharp.
 
-This is a work in progress, and currently only works with project containing a `.sln` project file.
+This has only been tested on Linux. 
 
-If you would want to try to run it anyways, you need `Microsoft.CodeAnalysis.LanguageServer` on your path. I got it from nix package: `roslyn-ls`.
+This tool works around the quirks of `Microsoft.CodeAnalysis.LanguageServer` in the following way: 
+- Launches `Microsoft.CodeAnalysis.LanguageServer` as a process
+- Passes the provided `unix socket` and forwards all communication to `stdio`
+- Waits for an `Initialize` notification from the client
+- Finds relevant `.sln` or `.csproj` files and sends them to the server as an `open` notification.
+
+# Installation
+
+## `Microsoft.CodeAnalysis.LanguageServer`
+The wrapper uses `Microsoft.CodeAnalysis.LanguageServer` so you need this on your path. 
+If you use `nix`, you can grab `nixpkgs.roslyn-ls`. 
+
+Otherwise:
+- Find and download `Microsoft.CodeAnalysis.LanguageServer` for your architecture at the [public feed](https://dev.azure.com/azure-public/vside/_artifacts/feed/vs-impl).
+- Unzip the `.nupkg` file with `unzip`
+- Find and move the `Microsoft.CodeAnalysis.LanguageServer` executable to a directory on your path, e.g., `~/.local/bin`.
+
+## The wrapper
+If you use `nix`, you can use this repository's `nix flake`. 
+
+Alternatively, install with `cargo`: `cargo install --git https://github.com/SofusA/roslyn-language-server` 
 
 ## Use with Helix
 Since `Microsoft.CodeAnalysis.LanguageServer` only supports `pull diagnostics` and Helix does not (yet), you would need to use my branch at `github:sofusa/helix-pull-diagnostics`.
@@ -16,6 +37,3 @@ command = "roslyn-language-server"
 name = "c-sharp"
 language-servers = ["roslyn"]
 ```
-
-## To do: 
-- Find and open `.csproj` files if no `.sln` file was found
