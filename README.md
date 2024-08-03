@@ -7,8 +7,10 @@ This has only been tested on Linux.
 This tool works around the quirks of `Microsoft.CodeAnalysis.LanguageServer` in the following way: 
 - Launches `Microsoft.CodeAnalysis.LanguageServer` as a process
 - Passes the provided `unix socket` and forwards all communication to `stdio`
+- Waits for `Capabilities` notification from server
+  - Forces `pull diagnostics` to be available. This is a hack to make the server respect clients who does not support dynamic regisration of diagnostic capabilities. This is should be considered a bug in the server and can hopefully be removed with a future version of server
 - Waits for an `Initialize` notification from the client
-- Finds relevant `.sln` or `.csproj` files and sends them to the server as an `open` notification.
+  - Finds relevant `.sln` or `.csproj` files and sends them to the server as an `open` notification.
 
 # Installation
 
