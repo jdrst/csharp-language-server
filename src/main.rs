@@ -69,7 +69,9 @@ async fn main() {
             if message.contains("initialize") {
                 let root_path = parse_root_path(&message)
                     .expect("Root path not part of initialize notification");
-                let solution_to_open = find_solution_to_open(&root_path);
+
+                let solution_files = find_extension(&root_path, "sln");
+                let solution_to_open = solution_files.first().map(|found| found.to_owned());
 
                 if let Some(solution_to_open) = solution_to_open {
                     let open_solution_notification =
@@ -83,7 +85,14 @@ async fn main() {
                     break;
                 }
 
-                // TODO: Search for csproj files and send projects/open notification
+                let project_files = find_extension(&root_path, "csproj");
+                let open_projects_notification = create_open_projects_notification(project_files);
+
+                writer
+                    .write_all(open_projects_notification.as_bytes())
+                    .await
+                    .expect("Unable to send open projects notification to server");
+
                 break;
             }
         }
@@ -117,23 +126,42 @@ async fn parse_roslyn_response(reader: BufReader<ChildStdout>) -> Result<RoslynR
     Ok(parsed)
 }
 
-fn find_solution_to_open(root_path: &str) -> Option<String> {
-    let solution_search: Vec<String> = SearchBuilder::default()
+fn find_extension(root_path: &str, extension: &str) -> Vec<String> {
+    SearchBuilder::default()
         .location(root_path)
-        .ext("sln")
+        .ext(extension)
         .build()
-        .collect();
-
-    solution_search.first().map(|found| found.to_owned())
+        .collect()
 }
 
 fn create_open_solution_notification(file_path: &str) -> String {
     let notificatin = Notification {
         jsonrpc: "2.0".to_string(),
         method: "solution/open".to_string(),
-        params: SolutionParams {
-            solution: format!("file://{file_path}"),
-        },
+        params: Params::SolutionParams(SolutionParams {
+            solution: path_to_uri(file_path),
+        }),
+    };
+
+    let message = serde_json::to_string(&notificatin).expect("Unable to serialize notification");
+
+    create_notification(&message)
+}
+
+fn path_to_uri(file_path: &str) -> String {
+    format!("file://{file_path}")
+}
+
+fn create_open_projects_notification(file_paths: Vec<String>) -> String {
+    let uris: Vec<String> = file_paths
+        .iter()
+        .map(|file_path| path_to_uri(file_path))
+        .collect();
+
+    let notificatin = Notification {
+        jsonrpc: "2.0".to_string(),
+        method: "project/open".to_string(),
+        params: Params::ProjectParams(ProjectParams { projects: uris }),
     };
 
     let message = serde_json::to_string(&notificatin).expect("Unable to serialize notification");
@@ -149,13 +177,25 @@ fn create_notification(body: &str) -> String {
 }
 
 #[derive(Serialize, Debug)]
+#[serde(untagged)]
+enum Params {
+    SolutionParams(SolutionParams),
+    ProjectParams(ProjectParams),
+}
+
+#[derive(Serialize, Debug)]
 struct Notification {
     jsonrpc: String,
     method: String,
-    params: SolutionParams,
+    params: Params,
 }
 
 #[derive(Serialize, Debug)]
 struct SolutionParams {
     solution: String,
+}
+
+#[derive(Serialize, Debug)]
+struct ProjectParams {
+    projects: Vec<String>,
 }
