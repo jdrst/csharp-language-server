@@ -69,6 +69,19 @@ async fn main() {
                 stdout
                     .write_all(patched_result_notification.as_bytes())
                     .await?;
+            }
+
+            if notification.contains("workspace/projectInitializationComplete") {
+                let refresh_notification = NotificationArrayParams {
+                    jsonrpc: "2.0".to_string(),
+                    method: "workspace/diagnostic/refresh".to_string(),
+                    params: vec![],
+                };
+
+                stdout
+                    .write_all(refresh_notification.serialize().as_bytes())
+                    .await?;
+                stdout.write_all(notification.as_bytes()).await?;
 
                 break;
             }
@@ -174,17 +187,15 @@ fn find_extension(root_path: &str, extension: &str) -> Vec<String> {
 }
 
 fn create_open_solution_notification(file_path: &str) -> String {
-    let notificatin = Notification {
+    let notification = Notification {
         jsonrpc: "2.0".to_string(),
         method: "solution/open".to_string(),
-        params: Params::SolutionParams(SolutionParams {
+        params: Params::Solution(SolutionParams {
             solution: path_to_uri(file_path),
         }),
     };
 
-    let message = serde_json::to_string(&notificatin).expect("Unable to serialize notification");
-
-    create_notification(&message)
+    notification.serialize()
 }
 
 fn path_to_uri(file_path: &str) -> String {
@@ -197,22 +208,13 @@ fn create_open_projects_notification(file_paths: Vec<String>) -> String {
         .map(|file_path| path_to_uri(file_path))
         .collect();
 
-    let notificatin = Notification {
+    let notification = Notification {
         jsonrpc: "2.0".to_string(),
         method: "project/open".to_string(),
-        params: Params::ProjectParams(ProjectParams { projects: uris }),
+        params: Params::Project(ProjectParams { projects: uris }),
     };
 
-    let message = serde_json::to_string(&notificatin).expect("Unable to serialize notification");
-
-    create_notification(&message)
-}
-
-fn create_notification(body: &str) -> String {
-    let header = format!("Content-Length: {}\r\n\r\n", body.len());
-    let full_messsage = format!("{}{}", header, body);
-
-    full_messsage
+    notification.serialize()
 }
 
 fn force_pull_diagnostics_hack(notification: &str) -> Result<String, std::io::Error> {
@@ -236,8 +238,8 @@ fn force_pull_diagnostics_hack(notification: &str) -> Result<String, std::io::Er
 #[derive(Serialize, Debug)]
 #[serde(untagged)]
 enum Params {
-    SolutionParams(SolutionParams),
-    ProjectParams(ProjectParams),
+    Solution(SolutionParams),
+    Project(ProjectParams),
 }
 
 #[derive(Serialize, Debug)]
@@ -248,6 +250,13 @@ struct Notification {
 }
 
 #[derive(Serialize, Debug)]
+struct NotificationArrayParams {
+    jsonrpc: String,
+    method: String,
+    params: Vec<String>,
+}
+
+#[derive(Serialize, Debug)]
 struct SolutionParams {
     solution: String,
 }
@@ -255,4 +264,25 @@ struct SolutionParams {
 #[derive(Serialize, Debug)]
 struct ProjectParams {
     projects: Vec<String>,
+}
+
+impl Notification {
+    fn serialize(self) -> String {
+        let body = serde_json::to_string(&self).expect("Unable to serialize notification");
+        create_notification(&body)
+    }
+}
+
+impl NotificationArrayParams {
+    fn serialize(self) -> String {
+        let body = serde_json::to_string(&self).expect("Unable to serialize notification");
+        create_notification(&body)
+    }
+}
+
+fn create_notification(body: &str) -> String {
+    let header = format!("Content-Length: {}\r\n\r\n", body.len());
+    let full_messsage = format!("{}{}", header, body);
+
+    full_messsage
 }
