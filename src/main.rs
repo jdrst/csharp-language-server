@@ -282,7 +282,7 @@ impl NotificationArrayParams {
 
 fn create_notification(body: &str) -> String {
     let header = format!("Content-Length: {}\r\n\r\n", body.len());
-    let full_messsage = format!("{}{}", header, body);
+    let full_message = format!("{}{}", header, body);
 
-    full_messsage
+    full_message
 }
