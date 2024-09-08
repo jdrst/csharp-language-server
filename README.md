@@ -2,8 +2,6 @@
 A wrapper around the language server behind the C# Visual Studio Code extension, `Microsoft.CodeAnalysis.LanguageServer`, which makes it compatible with other editors, e.g., Helix.
 This is more stable and faster than OmniSharp.
 
-This has only been tested on Linux. 
-
 This tool works around the quirks of `Microsoft.CodeAnalysis.LanguageServer` in the following way: 
 - Launches `Microsoft.CodeAnalysis.LanguageServer` as a process
 - Passes the provided `unix socket` and forwards all communication to `stdio`
@@ -21,7 +19,7 @@ If you use `nix`, you can grab `nixpkgs.roslyn-ls`.
 Otherwise:
 - Find and download `Microsoft.CodeAnalysis.LanguageServer` for your architecture at the [public feed](https://dev.azure.com/azure-public/vside/_artifacts/feed/vs-impl).
 - Unzip the `.nupkg` file with `unzip`
-- Find and move the `Microsoft.CodeAnalysis.LanguageServer` executable to a directory on your path, e.g., `~/.local/bin`.
+- Find and move the `Microsoft.CodeAnalysis.LanguageServer` executable to a directory on your path, e.g., `~/.local/bin` on linux.
 
 ## The wrapper
 If you use `nix`, you can use this repository's `nix flake`. 
