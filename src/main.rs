@@ -94,19 +94,6 @@ async fn main() {
                 stdout
                     .write_all(patched_result_notification.as_bytes())
                     .await?;
-            }
-
-            if notification.contains("workspace/projectInitializationComplete") {
-                let refresh_notification = NotificationArrayParams {
-                    jsonrpc: "2.0".to_string(),
-                    method: "workspace/diagnostic/refresh".to_string(),
-                    params: vec![],
-                };
-
-                stdout
-                    .write_all(refresh_notification.serialize().as_bytes())
-                    .await?;
-                stdout.write_all(notification.as_bytes()).await?;
 
                 break;
             }
@@ -275,13 +262,6 @@ struct Notification {
 }
 
 #[derive(Serialize, Debug)]
-struct NotificationArrayParams {
-    jsonrpc: String,
-    method: String,
-    params: Vec<String>,
-}
-
-#[derive(Serialize, Debug)]
 struct SolutionParams {
     solution: String,
 }
@@ -292,13 +272,6 @@ struct ProjectParams {
 }
 
 impl Notification {
-    fn serialize(self) -> String {
-        let body = serde_json::to_string(&self).expect("Unable to serialize notification");
-        create_notification(&body)
-    }
-}
-
-impl NotificationArrayParams {
     fn serialize(self) -> String {
         let body = serde_json::to_string(&self).expect("Unable to serialize notification");
         create_notification(&body)
