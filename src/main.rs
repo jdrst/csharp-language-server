@@ -5,8 +5,7 @@ use rust_search::SearchBuilder;
 use serde_json::{json, Value};
 use std::process::Stdio;
 use tokio::{
-    io::{self, AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader},
-    net::UnixStream,
+    io::{self, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader},
     process::{ChildStdout, Command},
 };
 
@@ -17,6 +16,26 @@ struct RoslynResponse {
     #[serde(rename = "pipeName")]
     pipe_name: String,
 }
+trait PipeStream: AsyncRead + AsyncWrite + Unpin + Send {}
+impl<T> PipeStream for T where T: AsyncRead + AsyncWrite + Unpin + Send {}
+
+struct Pipe {}
+impl Pipe {
+    pub async fn connect(pipe_name: &str) -> Result<Box<dyn PipeStream>> {
+        #[cfg(target_os = "windows")]
+        {
+            use tokio::net::windows::named_pipe::ClientOptions;
+            let client = ClientOptions::new().open(pipe_name)?;
+            Ok(Box::new(client))
+        }
+        #[cfg(target_os = "linux")]
+        {
+            use tokio::net::UnixStream;
+            let stream = UnixStream::connect(pipe_name).await?;
+            Ok(Box::new(stream))
+        }
+    }
+}
 
 #[tokio::main]
 async fn main() {
@@ -25,7 +44,13 @@ async fn main() {
         .into_os_string();
     log_dir.push("/.roslyn/logs");
 
-    let mut process = Command::new("Microsoft.CodeAnalysis.LanguageServer")
+    let lsp_path = if cfg!(windows) {
+        "Microsoft.CodeAnalysis.LanguageServer.exe"
+    } else {
+        "Microsoft.CodeAnalysis.LanguageServer"
+    };
+
+    let mut process = Command::new(lsp_path)
         .arg("--logLevel=Information")
         .arg("--extensionLogDirectory")
         .arg(log_dir)
@@ -38,11 +63,11 @@ async fn main() {
         .await
         .expect("Unable to parse response from server");
 
-    let mut stream = UnixStream::connect(roslyn_response.pipe_name)
+    let pipe = Pipe::connect(&roslyn_response.pipe_name)
         .await
         .expect("Unable to connect to server stream");
 
-    let (reader, mut writer) = stream.split();
+    let (reader, mut writer) = tokio::io::split(pipe);
 
     let stdin = io::stdin();
     let mut stdout = io::stdout();
