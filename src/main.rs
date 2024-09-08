@@ -5,37 +5,14 @@ use rust_search::SearchBuilder;
 use serde_json::{json, Value};
 use std::process::Stdio;
 use tokio::{
-    io::{self, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader},
-    process::{ChildStdout, Command},
+    io::{self, AsyncReadExt, AsyncWriteExt, BufReader},
+    process::Command,
 };
 
-use serde::{Deserialize, Serialize};
-
-#[derive(Serialize, Deserialize)]
-struct RoslynResponse {
-    #[serde(rename = "pipeName")]
-    pipe_name: String,
-}
-trait PipeStream: AsyncRead + AsyncWrite + Unpin + Send {}
-impl<T> PipeStream for T where T: AsyncRead + AsyncWrite + Unpin + Send {}
-
-struct Pipe {}
-impl Pipe {
-    pub async fn connect(pipe_name: &str) -> Result<Box<dyn PipeStream>> {
-        #[cfg(target_os = "windows")]
-        {
-            use tokio::net::windows::named_pipe::ClientOptions;
-            let client = ClientOptions::new().open(pipe_name)?;
-            Ok(Box::new(client))
-        }
-        #[cfg(target_os = "linux")]
-        {
-            use tokio::net::UnixStream;
-            let stream = UnixStream::connect(pipe_name).await?;
-            Ok(Box::new(stream))
-        }
-    }
-}
+use roslyn_language_server::{
+    notification::{create_notification, Notification, Params, ProjectParams, SolutionParams},
+    pipe_stream::{parse_roslyn_response, Pipe},
+};
 
 #[tokio::main]
 async fn main() {
@@ -180,16 +157,6 @@ fn parse_root_path(notification: &str) -> Result<String> {
     Ok(root_path.to_string())
 }
 
-async fn parse_roslyn_response(reader: BufReader<ChildStdout>) -> Result<RoslynResponse> {
-    let first_line = reader
-        .lines()
-        .next_line()
-        .await?
-        .context("No lines to read")?;
-    let parsed = serde_json::from_str::<RoslynResponse>(&first_line)?;
-    Ok(parsed)
-}
-
 fn find_extension(root_path: &str, extension: &str) -> Vec<String> {
     SearchBuilder::default()
         .location(root_path)
@@ -245,42 +212,4 @@ fn force_pull_diagnostics_hack(notification: &str) -> Result<String, std::io::Er
     parsed_notification["result"]["capabilities"]["diagnosticProvider"] = diagnostic_provider;
 
     Ok(create_notification(&parsed_notification.to_string()))
-}
-
-#[derive(Serialize, Debug)]
-#[serde(untagged)]
-enum Params {
-    Solution(SolutionParams),
-    Project(ProjectParams),
-}
-
-#[derive(Serialize, Debug)]
-struct Notification {
-    jsonrpc: String,
-    method: String,
-    params: Params,
-}
-
-#[derive(Serialize, Debug)]
-struct SolutionParams {
-    solution: String,
-}
-
-#[derive(Serialize, Debug)]
-struct ProjectParams {
-    projects: Vec<String>,
-}
-
-impl Notification {
-    fn serialize(self) -> String {
-        let body = serde_json::to_string(&self).expect("Unable to serialize notification");
-        create_notification(&body)
-    }
-}
-
-fn create_notification(body: &str) -> String {
-    let header = format!("Content-Length: {}\r\n\r\n", body.len());
-    let full_message = format!("{}{}", header, body);
-
-    full_message
 }
