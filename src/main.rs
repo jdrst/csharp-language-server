@@ -1,48 +1,19 @@
 use ::futures::future::try_join;
 use anyhow::{Context, Result};
-use home::home_dir;
 use rust_search::SearchBuilder;
 use serde_json::{json, Value};
-use std::process::Stdio;
-use tokio::{
-    io::{self, AsyncReadExt, AsyncWriteExt, BufReader},
-    process::Command,
-};
+use tokio::io::{self, AsyncReadExt, AsyncWriteExt, BufReader};
 
 use roslyn_language_server::{
-    notification::{create_notification, Notification, Params, ProjectParams, SolutionParams},
-    pipe_stream::{parse_roslyn_response, Pipe},
+    notification::{
+        add_content_length_header, Notification, Params, ProjectParams, SolutionParams,
+    },
+    roslyn::start_roslyn,
 };
 
 #[tokio::main]
 async fn main() {
-    let mut log_dir = home_dir()
-        .expect("Unable to find home directory")
-        .into_os_string();
-    log_dir.push("/.roslyn/logs");
-
-    let lsp_path = if cfg!(windows) {
-        "Microsoft.CodeAnalysis.LanguageServer.exe"
-    } else {
-        "Microsoft.CodeAnalysis.LanguageServer"
-    };
-
-    let mut process = Command::new(lsp_path)
-        .arg("--logLevel=Information")
-        .arg("--extensionLogDirectory")
-        .arg(log_dir)
-        .stdout(Stdio::piped())
-        .spawn()
-        .expect("Failed to execute command");
-
-    let reader = BufReader::new(process.stdout.take().expect("Failed to capture stdout"));
-    let roslyn_response = parse_roslyn_response(reader)
-        .await
-        .expect("Unable to parse response from server");
-
-    let pipe = Pipe::connect(&roslyn_response.pipe_name)
-        .await
-        .expect("Unable to connect to server stream");
+    let pipe = start_roslyn().await;
 
     let (reader, mut writer) = tokio::io::split(pipe);
 
@@ -211,5 +182,5 @@ fn force_pull_diagnostics_hack(notification: &str) -> Result<String, std::io::Er
 
     parsed_notification["result"]["capabilities"]["diagnosticProvider"] = diagnostic_provider;
 
-    Ok(create_notification(&parsed_notification.to_string()))
+    Ok(add_content_length_header(&parsed_notification.to_string()))
 }

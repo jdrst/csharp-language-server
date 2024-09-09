@@ -1,15 +1,5 @@
-use anyhow::{Context, Result};
-use serde::{Deserialize, Serialize};
-use tokio::{
-    io::{AsyncBufReadExt, AsyncRead, AsyncWrite, BufReader},
-    process::ChildStdout,
-};
-
-#[derive(Serialize, Deserialize)]
-pub struct RoslynResponse {
-    #[serde(rename = "pipeName")]
-    pub pipe_name: String,
-}
+use anyhow::Result;
+use tokio::io::{AsyncRead, AsyncWrite};
 
 pub trait PipeStream: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T> PipeStream for T where T: AsyncRead + AsyncWrite + Unpin + Send {}
@@ -30,14 +20,4 @@ impl Pipe {
             Ok(Box::new(stream))
         }
     }
-}
-
-pub async fn parse_roslyn_response(reader: BufReader<ChildStdout>) -> Result<RoslynResponse> {
-    let first_line = reader
-        .lines()
-        .next_line()
-        .await?
-        .context("No lines to read")?;
-    let parsed = serde_json::from_str::<RoslynResponse>(&first_line)?;
-    Ok(parsed)
 }

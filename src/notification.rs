@@ -27,11 +27,11 @@ pub struct ProjectParams {
 impl Notification {
     pub fn serialize(self) -> String {
         let body = serde_json::to_string(&self).expect("Unable to serialize notification");
-        create_notification(&body)
+        add_content_length_header(&body)
     }
 }
 
-pub fn create_notification(body: &str) -> String {
+pub fn add_content_length_header(body: &str) -> String {
     let header = format!("Content-Length: {}\r\n\r\n", body.len());
     let full_message = format!("{}{}", header, body);
 
