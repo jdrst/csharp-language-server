@@ -3,25 +3,15 @@ A wrapper around the language server behind the C# Visual Studio Code extension,
 This is more stable and faster than OmniSharp.
 
 This tool works around the quirks of `Microsoft.CodeAnalysis.LanguageServer` in the following way: 
+- Installs `Microsoft.CodeAnalysis.LanguageServer` in `~/.roslyn`
 - Launches `Microsoft.CodeAnalysis.LanguageServer` as a process
-- Passes the provided `unix socket` and forwards all communication to `stdio`
-- Waits for `Capabilities` notification from server
-  - Forces `pull diagnostics` to be available. This is a hack to make the server respect clients who does not support dynamic regisration of diagnostic capabilities. This is should be considered a bug in the server and can hopefully be removed with a future version of server
-- Waits for an `Initialize` notification from the client
+- Passes the provided `unix socket` or named pipe and forwards all communication to `stdio` 
+- Waits for `capabilities` notification from the server
+  - Forces `pull diagnostics` to be available. This is a hack to make the server respect clients who do not support dynamic registration of diagnostic capabilities. This should be considered a bug in the server and can hopefully be removed with a future version of the server
+- Waits for an `initialize` notification from the client
   - Finds relevant `.sln` or `.csproj` files and sends them to the server as an `open` notification.
 
 # Installation
-
-## `Microsoft.CodeAnalysis.LanguageServer`
-The wrapper uses `Microsoft.CodeAnalysis.LanguageServer` so you need this on your path. 
-If you use `nix`, you can grab `nixpkgs.roslyn-ls`. 
-
-Otherwise:
-- Find and download `Microsoft.CodeAnalysis.LanguageServer` for your architecture at the [public feed](https://dev.azure.com/azure-public/vside/_artifacts/feed/vs-impl).
-- Unzip the `.nupkg` file with `unzip`
-- Find and move the `Microsoft.CodeAnalysis.LanguageServer` executable to a directory on your path, e.g., `~/.local/bin` on linux.
-
-## The wrapper
 If you use `nix`, you can use this repository's `nix flake`. 
 
 Alternatively, install with `cargo`: `cargo install --git https://github.com/SofusA/roslyn-language-server` 

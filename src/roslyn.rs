@@ -8,7 +8,10 @@ use tokio::{
     process::{ChildStdout, Command},
 };
 
-use crate::pipe_stream::{Pipe, PipeStream};
+use crate::{
+    download_roslyn::ensure_roslyn_is_installed,
+    pipe_stream::{Pipe, PipeStream},
+};
 
 #[derive(Serialize, Deserialize)]
 struct RoslynResponse {
@@ -30,18 +33,14 @@ async fn parse_roslyn_response(reader: BufReader<ChildStdout>) -> Result<RoslynR
 }
 
 pub async fn start_roslyn() -> Box<dyn PipeStream> {
-    let mut log_dir = home_dir()
-        .expect("Unable to find home directory")
-        .into_os_string();
-    log_dir.push("/.roslyn/logs");
+    let roslyn_dll = ensure_roslyn_is_installed().expect("Unable to install Roslyn");
 
-    let lsp_path = if cfg!(windows) {
-        "Microsoft.CodeAnalysis.LanguageServer.exe"
-    } else {
-        "Microsoft.CodeAnalysis.LanguageServer"
-    };
+    let mut log_dir = home_dir().expect("Unable to find home directory");
+    log_dir.push(".roslyn");
+    log_dir.push("logs");
 
-    let mut process = Command::new(lsp_path)
+    let mut process = Command::new("dotnet")
+        .arg(roslyn_dll)
         .arg("--logLevel=Information")
         .arg("--extensionLogDirectory")
         .arg(log_dir)
