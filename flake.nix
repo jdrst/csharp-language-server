@@ -9,7 +9,7 @@
         pkgs = nixpkgs.legacyPackages.${system};
         roslyn-language-server = pkgs.rustPlatform.buildRustPackage {
           pname = "roslyn-language-server";
-          version = "0.1.0";
+          version = "0.2.1";
 
           src = ./.;
 

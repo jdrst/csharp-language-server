@@ -1,5 +1,6 @@
 use ::futures::future::try_join;
 use anyhow::{Context, Result};
+use clap::Parser;
 use rust_search::SearchBuilder;
 use serde_json::{json, Value};
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt, BufReader};
@@ -11,9 +12,18 @@ use roslyn_language_server::{
     roslyn::start_roslyn,
 };
 
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+struct Args {
+    #[arg(short, long)]
+    server_path: Option<String>,
+}
+
 #[tokio::main]
 async fn main() {
-    let pipe = start_roslyn().await;
+    let args = Args::parse();
+
+    let pipe = start_roslyn(args.server_path).await;
 
     let (reader, mut writer) = tokio::io::split(pipe);
 

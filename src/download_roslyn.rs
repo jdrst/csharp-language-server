@@ -3,14 +3,16 @@ use std::{env::temp_dir, io::Write, path::PathBuf};
 
 pub fn ensure_roslyn_is_installed() -> Result<PathBuf> {
     let mut version_dir = home::home_dir().expect("Unable to find home directory");
-    version_dir.push(".roslyn/server");
+    version_dir.push(".roslyn");
     version_dir.push("server");
     version_dir.push(VERSION);
     fs_extra::dir::create_all(&version_dir, false)?;
 
-    if std::path::Path::new(&version_dir).exists() {
-        version_dir.push("Microsoft.CodeAnalysis.LanguageServer.dll");
-        return Ok(version_dir);
+    let mut dll_path = version_dir.clone();
+    dll_path.push("Microsoft.CodeAnalysis.LanguageServer.dll");
+
+    if std::path::Path::new(&dll_path).exists() {
+        return Ok(dll_path);
     }
 
     let mut temp_dir = temp_dir();
@@ -46,8 +48,7 @@ pub fn ensure_roslyn_is_installed() -> Result<PathBuf> {
     fs_extra::dir::move_dir(&temp_dir, &version_dir, &copy_options)?;
     fs_extra::dir::remove(temp_dir)?;
 
-    version_dir.push("Microsoft.CodeAnalysis.LanguageServer.dll");
-    Ok(version_dir)
+    Ok(dll_path)
 }
 
 pub const VERSION: &str = "4.12.0-3.24461.2";
