@@ -3,7 +3,7 @@ use std::{env::temp_dir, io::Write, path::PathBuf};
 
 pub fn ensure_roslyn_is_installed() -> Result<PathBuf> {
     let mut version_dir = home::home_dir().expect("Unable to find home directory");
-    version_dir.push("/.roslyn/");
+    version_dir.push("/.roslyn/server");
     version_dir.push(VERSION);
 
     if std::path::Path::new(&version_dir).exists() {
