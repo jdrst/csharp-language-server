@@ -1,9 +1,6 @@
-name: Build
+name: CI
 
 on:
-  push:
-    branches:
-      - main
   pull_request:
     types: [ opened, reopened, synchronize ]
     branches:
@@ -27,8 +24,15 @@ jobs:
         profile: minimal
         override: true
 
+    - name: Check format
+      run: cargo fmt --check
+
+    - name: Clippy
+      run: cargo clippy
+
     - name: Build
-      run: cargo build --verbose
+      run: cargo build
 
     - name: Run tests
-      run: cargo test --verbose
+      if: matrix.os != 'windows-latest'
+      run: cargo test

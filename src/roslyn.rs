@@ -5,7 +5,7 @@ use home::home_dir;
 use serde::{Deserialize, Serialize};
 use tokio::{
     io::{AsyncBufReadExt, BufReader},
-    process::{ChildStdout, Command},
+    process::{Child, ChildStdout, Command},
 };
 
 use crate::{
@@ -32,21 +32,33 @@ async fn parse_roslyn_response(reader: BufReader<ChildStdout>) -> Result<RoslynR
     }
 }
 
-pub async fn start_roslyn() -> Box<dyn PipeStream> {
-    let roslyn_dll = ensure_roslyn_is_installed().expect("Unable to install Roslyn");
-
+pub async fn start_roslyn(server_path: Option<String>) -> Box<dyn PipeStream> {
     let mut log_dir = home_dir().expect("Unable to find home directory");
     log_dir.push(".roslyn");
     log_dir.push("logs");
 
-    let mut process = Command::new("dotnet")
-        .arg(roslyn_dll)
-        .arg("--logLevel=Information")
-        .arg("--extensionLogDirectory")
-        .arg(log_dir)
-        .stdout(Stdio::piped())
-        .spawn()
-        .expect("Failed to execute command");
+    let mut process: Child;
+
+    if let Some(server_path) = server_path {
+        process = Command::new(server_path)
+            .arg("--logLevel=Information")
+            .arg("--extensionLogDirectory")
+            .arg(log_dir)
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("Failed to execute command");
+    } else {
+        let roslyn_dll = ensure_roslyn_is_installed().expect("Unable to install Roslyn");
+
+        process = Command::new("dotnet")
+            .arg(roslyn_dll)
+            .arg("--logLevel=Information")
+            .arg("--extensionLogDirectory")
+            .arg(log_dir)
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("Failed to execute command");
+    }
 
     let reader = BufReader::new(process.stdout.take().expect("Failed to capture stdout"));
 

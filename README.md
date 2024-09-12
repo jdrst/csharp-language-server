@@ -12,9 +12,21 @@ This tool works around the quirks of `Microsoft.CodeAnalysis.LanguageServer` in 
   - Finds relevant `.sln` or `.csproj` files and sends them to the server as an `open` notification.
 
 # Installation
+
+## Windows
+The wrapper uses `Microsoft.CodeAnalysis.LanguageServer` and automatic download does unfortunatly not work on Windows. 
+- Find and download `Microsoft.CodeAnalysis.LanguageServer` for your architecture at the [public feed](https://dev.azure.com/azure-public/vside/_artifacts/feed/vs-impl).
+- Unzip the `.nupkg` file with `unzip`
+- Find and move the `Microsoft.CodeAnalysis.LanguageServer.exe` executable to a directory on your path
+- Run the `roslyn-language-server --server-path Microsoft.CodeAnalysis.LanguageServer.exe`
+
+## Nix
 If you use `nix`, you can use this repository's `nix flake`. 
 
+## Others
 Alternatively, install with `cargo`: `cargo install --git https://github.com/SofusA/roslyn-language-server` 
+
+# Usage
 
 ## Use with Helix
 Since `Microsoft.CodeAnalysis.LanguageServer` only supports `pull diagnostics` and Helix does not (yet), you would need to use my branch at `github:sofusa/helix-pull-diagnostics`.
