@@ -8,6 +8,11 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         roslyn-language-server = pkgs.rustPlatform.buildRustPackage {
+          checkFlags = [
+            # Test is unable to persist files while testing in nix
+            "--skip=first_line_is_jsonrpc"
+          ];
+
           pname = "roslyn-language-server";
           version = "0.2.1";
 
@@ -16,6 +21,9 @@
           cargoLock = {
             lockFile = ./Cargo.lock;
           };
+
+          nativeBuildInputs = [ pkgs.pkgs.dotnetCorePackages.dotnet_8.sdk ];
+
         };
       in
       {
