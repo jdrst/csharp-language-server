@@ -195,6 +195,7 @@ fn force_pull_diagnostics_hack(notification: &str) -> Result<String, std::io::Er
     let mut parsed_notification: Value = serde_json::from_str(&notification[json_start..])?;
 
     let diagnostic_provider = json!({
+        "identifier": "roslyn-language-server",
         "interFileDependencies": true,
         "workDoneProgress": true,
         "workspaceDiagnostics": true

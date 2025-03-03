@@ -4,6 +4,7 @@ use std::process::{Command, Stdio};
 
 #[test]
 fn first_line_is_jsonrpc() {
+    #[allow(clippy::zombie_processes)]
     let mut cmd = Command::cargo_bin("roslyn-language-server")
         .unwrap()
         .stdout(Stdio::piped())
@@ -19,8 +20,8 @@ fn first_line_is_jsonrpc() {
         .expect("No output received")
         .expect("Failed to read line");
 
+    cmd.kill().unwrap();
+
     // language server responds with a jsonrpc message
     assert!(first_line.contains("Content-Length"));
-
-    cmd.kill().unwrap();
 }
