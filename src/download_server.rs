@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use std::{
     env::temp_dir,
     fs,
@@ -22,13 +22,36 @@ pub async fn ensure_server_is_installed(
         return Ok(dll_path);
     }
 
+    let dotnet_sdk_output = match Command::new("dotnet").arg("--list-sdks").output().await {
+        Ok(output) => String::from_utf8(output.stdout)?,
+        Err(_) => bail!("Unable to get dotnet sdk version. Is dotnet installed?"),
+    };
+
+    let dotnet_sdk_version = match dotnet_sdk_output
+        .split('\n')
+        .filter_map(|line| line.chars().next())
+        .next_back()
+    {
+        Some(version) => version,
+        None => bail!("Unable to get dotnet sdk version. No sdk installations found"),
+    };
+
+    let dotnet_sdk_version_string = match dotnet_sdk_version {
+        '5' => "net5.0",
+        '6' => "net6.0",
+        '7' => "net7.0",
+        '8' => "net8.0",
+        '9' => "net9.0",
+        _ => bail!("Unsupported dotnet sdk: {}", dotnet_sdk_version),
+    };
+
     fs_extra::dir::create_all(&server_dir, remove_old_server_versions)?;
     fs_extra::dir::create_all(&dll_version_dir, true)?;
 
-    let temp_build_root = temp_dir().join("csharp-langauge-server");
+    let temp_build_root = temp_dir().join("csharp-language-server");
     fs_extra::dir::create(&temp_build_root, true)?;
 
-    create_csharp_project(&temp_build_root)?;
+    create_csharp_project(&temp_build_root, dotnet_sdk_version_string)?;
 
     Command::new("dotnet")
         .arg("add")
@@ -58,12 +81,12 @@ pub async fn ensure_server_is_installed(
     Ok(dll_path)
 }
 
-fn create_csharp_project(temp_dir: &Path) -> Result<()> {
+fn create_csharp_project(temp_dir: &Path, dotnet_sdk_version_string: &str) -> Result<()> {
     let mut nuget_config_file = std::fs::File::create(temp_dir.join("NuGet.config"))?;
     nuget_config_file.write_all(NUGET.as_bytes())?;
 
     let mut csproj_file = std::fs::File::create(temp_dir.join("ServerDownload.csproj")).unwrap();
-    csproj_file.write_all(CSPROJ.as_bytes())?;
+    csproj_file.write_all(csproj_string(dotnet_sdk_version_string).as_bytes())?;
 
     Ok(())
 }
@@ -79,12 +102,15 @@ const NUGET: &str = "<?xml version=\"1.0\" encoding=\"utf-8\"?>
 </configuration>
     ";
 
-const CSPROJ: &str = "<Project Sdk=\"Microsoft.NET.Sdk\">
-    <PropertyGroup>
-        <RestorePackagesPath>out</RestorePackagesPath>
-        <TargetFramework>net9.0</TargetFramework>
-        <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>
-        <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
-    </PropertyGroup>
-</Project>
-";
+fn csproj_string(dotnet_sdk_version_string: &str) -> String {
+    format!(
+        "<Project Sdk=\"Microsoft.NET.Sdk\">
+            <PropertyGroup>
+                <RestorePackagesPath>out</RestorePackagesPath>
+                <TargetFramework>{dotnet_sdk_version_string}</TargetFramework>
+                <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>
+                <AutomaticallyUseReferenceAssemblyPackages>false</AutomaticallyUseReferenceAssemblyPackages>
+            </PropertyGroup>
+         </Project>"
+    )
+}
