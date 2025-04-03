@@ -1,6 +1,6 @@
 use std::process::Stdio;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use tokio::{

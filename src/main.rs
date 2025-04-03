@@ -2,12 +2,12 @@ use ::futures::future::try_join;
 use anyhow::{Context, Result};
 use clap::Parser;
 use rust_search::SearchBuilder;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt, BufReader};
 
 use csharp_language_server::{
     notification::{
-        add_content_length_header, Notification, Params, ProjectParams, SolutionParams,
+        Notification, Params, ProjectParams, SolutionParams, add_content_length_header,
     },
     server::start_server,
     server_version::SERVER_VERSION,
