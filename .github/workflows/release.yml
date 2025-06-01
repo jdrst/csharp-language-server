@@ -1,9 +1,32 @@
+name: Release
+
 on:
   release:
     types: [created]
 
 jobs:
+  download-server:
+    name: Download server
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Download language server
+        run: ./download-server
+
+      - name: Upload language server artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: language-server
+          path: language-server.zip
+
   release:
+    needs: download-server
     name: release ${{ matrix.target }}
     strategy:
       matrix:
@@ -19,6 +42,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Download language server artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: language-server
 
       - uses: actions/setup-dotnet@v4
         with:
