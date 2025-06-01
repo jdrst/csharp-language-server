@@ -3,5 +3,3 @@
 version=$(dotnet package search Microsoft.CodeAnalysis.LanguageServer.neutral --source https://pkgs.dev.azure.com/azure-public/vside/_packaging/vs-impl/nuget/v3/index.json --prerelease --format json | jq -r ".searchResult[0].packages[0].latestVersion")
 
 echo "pub const SERVER_VERSION: &str = \"$version\";" > ./src/server_version.rs
-
-echo $version > ./download-server-project/version.txt

@@ -1,7 +1,7 @@
 #! /bin/bash
 
+version=$(cat src/server_version.rs | sed -n 's/.*"\(.*\)".*/\1/p')
 cd ./download-server-project
-version=$(cat version.txt)
 
 dotnet add package Microsoft.CodeAnalysis.LanguageServer.neutral -v $version
 
