@@ -1,6 +1,6 @@
 [package]
 name = "csharp-language-server"
-version = "0.6.0"
+version = "0.5.1"
 edition = "2024"
 authors = ["Sofus Addington"]
 description = "A tool that simplifies installation and running C# language server"
@@ -15,7 +15,6 @@ rust_search = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tokio = { version = "1", features = ["full"] }
-zip = "4"
 
 [dev-dependencies]
 assert_cmd = "2"
