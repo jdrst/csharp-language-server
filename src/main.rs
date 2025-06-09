@@ -19,12 +19,26 @@ struct Args {
     /// Remove old versions of Microsoft.CodeAnalysis.LanguageServer
     #[arg(short, long, default_value_t = true)]
     remove_old_server_versions: bool,
+
+    /// Download Microsoft.CodeAnalysis.LanguageServer
+    #[arg(short, long, default_value_t = false)]
+    download: bool,
 }
 
 #[tokio::main]
 async fn main() {
     let args = Args::parse();
     let version = SERVER_VERSION;
+
+    if args.download {
+        println!("Downloading language server");
+
+        csharp_language_server::server::download_server(version, args.remove_old_server_versions)
+            .await;
+
+        println!("Done!");
+        return;
+    }
 
     let (mut server_stdin, server_stdout) =
         start_server(version, args.remove_old_server_versions).await;

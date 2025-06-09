@@ -1,5 +1,5 @@
 use directories::ProjectDirs;
-use std::process::Stdio;
+use std::{path::PathBuf, process::Stdio};
 use tokio::process::Command;
 
 use crate::download_server::ensure_server_is_installed;
@@ -8,10 +8,7 @@ pub async fn start_server(
     version: &str,
     remove_old_server_versions: bool,
 ) -> (tokio::process::ChildStdin, tokio::process::ChildStdout) {
-    let cache_dir = ProjectDirs::from("com", "github", "csharp-language-server")
-        .expect("Unable to find cache directory")
-        .cache_dir()
-        .to_path_buf();
+    let cache_dir = cache_dir();
 
     let log_dir = cache_dir.join("log");
 
@@ -31,4 +28,19 @@ pub async fn start_server(
         .expect("Failed to execute command");
 
     (command.stdin.unwrap(), command.stdout.unwrap())
+}
+
+pub async fn download_server(version: &str, remove_old_server_versions: bool) {
+    let cache_dir = cache_dir();
+
+    ensure_server_is_installed(version, remove_old_server_versions, &cache_dir)
+        .await
+        .expect("Unable to install server");
+}
+
+fn cache_dir() -> PathBuf {
+    ProjectDirs::from("com", "github", "csharp-language-server")
+        .expect("Unable to find cache directory")
+        .cache_dir()
+        .to_path_buf()
 }
