@@ -15,6 +15,9 @@ Download the binaries that match your platform under Releases
 ### Others
 Alternatively, install with `cargo`: `cargo install --git https://github.com/SofusA/csharp-language-server` 
 
+## First launch
+The tool will download `Microsoft.CodeAnalysis.LanguageServer` at the first launch. It may take some seconds. To avoid this, you can run `csharp-language-server --download` before your first launch. This is useful for install scripts.
+
 ## Usage
 
 ### Helix
@@ -45,3 +48,15 @@ vim.api.nvim_create_autocmd('FileType', {
   end,
 })
 ``` 
+
+### Zed
+`pull diagnostics` are available from version `0.191` which is currently in pre-release. Install that and override your `omnisharp`-config:
+```json
+"lsp": {
+  "omnisharp": {
+    "binary": {
+      "path": "csharp-language-server"
+    }
+  }
+}
+```
