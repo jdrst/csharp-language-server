@@ -1,8 +1,8 @@
 use std::{path::PathBuf, str::FromStr};
 
-use ::futures::future::try_join;
 use anyhow::{Context, Result};
 use clap::Parser;
+use futures::future::try_join;
 use rust_search::SearchBuilder;
 use serde_json::{Value, json};
 use tokio::io::{self, AsyncReadExt, AsyncWriteExt, BufReader};
@@ -29,6 +29,14 @@ struct Args {
     /// Override directory to download and execute Microsoft.CodeAnalysis.LanguageServer
     #[arg(short, long)]
     directory: Option<String>,
+
+    /// Override solution (.sln) path. Absolute path
+    #[arg(short, long)]
+    solution_path: Option<String>,
+
+    /// Override project(s) (.csproj) path(s). Absolute path. Solution path takes precedence
+    #[arg(short, long)]
+    project_paths: Option<Vec<String>>,
 }
 
 #[tokio::main]
@@ -117,13 +125,10 @@ async fn main() {
                 let root_path = parse_root_path(&notification)
                     .expect("Root path not part of initialize notification");
 
-                let solution_files = find_extension(&root_path, "sln");
-                let solution_to_open = solution_files.first().map(|found| found.to_owned());
+                let open_solution_notification =
+                    open_solution_notification(&root_path, args.solution_path);
 
-                if let Some(solution_to_open) = solution_to_open {
-                    let open_solution_notification =
-                        create_open_solution_notification(&solution_to_open);
-
+                if let Some(open_solution_notification) = open_solution_notification {
                     server_stdin
                         .write_all(open_solution_notification.as_bytes())
                         .await
@@ -132,8 +137,8 @@ async fn main() {
                     break;
                 }
 
-                let project_files = find_extension(&root_path, "csproj");
-                let open_projects_notification = create_open_projects_notification(project_files);
+                let open_projects_notification =
+                    open_projects_notification(&root_path, args.project_paths);
 
                 server_stdin
                     .write_all(open_projects_notification.as_bytes())
@@ -158,11 +163,11 @@ fn parse_root_path(notification: &str) -> Result<String> {
 
     let parsed_notification: Value = serde_json::from_str(&notification[json_start..])?;
 
-    let root_path = (parsed_notification["params"]["rootUri"]
+    let root_path = parsed_notification["params"]["rootUri"]
         .as_str()
-        .map(uri_to_path))
-    .or_else(|| parsed_notification["params"]["rootPath"].as_str())
-    .context("Root URI/path was not given by the client")?;
+        .map(uri_to_path)
+        .or_else(|| parsed_notification["params"]["rootPath"].as_str())
+        .context("Root URI/path was not given by the client")?;
 
     Ok(root_path.to_string())
 }
@@ -175,16 +180,27 @@ fn find_extension(root_path: &str, extension: &str) -> Vec<String> {
         .collect()
 }
 
-fn create_open_solution_notification(file_path: &str) -> String {
-    let notification = Notification {
-        jsonrpc: "2.0".to_string(),
-        method: "solution/open".to_string(),
-        params: Params::Solution(SolutionParams {
-            solution: path_to_uri(file_path),
-        }),
+fn open_solution_notification(root_path: &str, override_path: Option<String>) -> Option<String> {
+    let file_path = match override_path {
+        Some(path) => path,
+        None => {
+            let solution_files = find_extension(root_path, "sln");
+            solution_files.first()?.to_owned()
+        }
     };
 
-    notification.serialize()
+    eprintln!("Path: {}", file_path);
+
+    Some(
+        Notification {
+            jsonrpc: "2.0".to_string(),
+            method: "solution/open".to_string(),
+            params: Params::Solution(SolutionParams {
+                solution: path_to_uri(&file_path),
+            }),
+        }
+        .serialize(),
+    )
 }
 
 fn path_to_uri(file_path: &str) -> String {
@@ -196,7 +212,9 @@ fn uri_to_path(uri: &str) -> &str {
         .expect("URI should start with \"file://\"")
 }
 
-fn create_open_projects_notification(file_paths: Vec<String>) -> String {
+fn open_projects_notification(root_path: &str, override_paths: Option<Vec<String>>) -> String {
+    let file_paths = override_paths.unwrap_or(find_extension(root_path, "csproj"));
+
     let uris: Vec<String> = file_paths
         .iter()
         .map(|file_path| path_to_uri(file_path))

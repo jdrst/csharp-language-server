@@ -15,7 +15,7 @@
           ];
 
           pname = "csharp-language-server";
-          version = "0.5.1";
+          version = "0.6.0";
 
           src = ./.;
 
