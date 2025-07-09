@@ -189,8 +189,6 @@ fn open_solution_notification(root_path: &str, override_path: Option<String>) ->
         }
     };
 
-    eprintln!("Path: {}", file_path);
-
     Some(
         Notification {
             jsonrpc: "2.0".to_string(),
